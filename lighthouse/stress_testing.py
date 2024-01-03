@@ -108,6 +108,8 @@ def main():
     args = parse_arguments()
 
     prompt = f"""Ho un dataset contenente i seguenti documenti: \n{DOCUMENTS}\n\nI documenti sono descritti dalle seguenti parole chiave: {KEYWORDS}\n\nIn base a queste informazioni, fai un riassunto di tutto il dataset.\nIl dataset descrive"""
+
+    os.makedirs('../input', exist_ok=True)
     if not torch.cuda.is_available():
         args.ngl=[0]
 
