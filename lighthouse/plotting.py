@@ -1,7 +1,6 @@
-import plotly.graph_objects as go
-import numpy as np
-
 import pandas as pd
+import plotly.graph_objects as go
+
 df = pd.read_csv('output/bulb.csv').drop(['id'], axis=1)
 # Create a mapping from model names to numbers
 map_fn = {model: i for i, model in enumerate(df['Model'].unique())}
