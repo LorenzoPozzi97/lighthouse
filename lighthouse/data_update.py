@@ -6,6 +6,11 @@ import pandas as pd
 import os
 import json
 
+def create_unique_id(row):
+    # NOTE 
+    # This function assumes that if there is an avalable GPU it is an NVIDIA
+    return '-'.join(map(str, row[['Device', 'VRAM (GB)', 'RAM (GB)', 'CPU Count', 'Model']]))
+
 def load_existing_dataframe(existing_df_path):
     """Load an existing DataFrame from a CSV file."""
     if os.path.exists(existing_df_path):
@@ -42,6 +47,7 @@ def process_json_files_in_folder(folder_path="input", existing_df_file='bulb.csv
 # new labels?
 if __name__=='__main__':
     final_df = process_json_files_in_folder()
+    final_df['Node ID'] = final_df.apply(create_unique_id, axis=1)
     final_df.to_csv('output/bulb.csv', index=False)
     print(final_df)
 

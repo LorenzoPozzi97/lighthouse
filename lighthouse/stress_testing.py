@@ -7,6 +7,8 @@ import argparse
 import datetime
 import itertools
 
+import pandas as pd
+
 #from tqdm import tqdm
 from llama_cpp import Llama, llama_get_timings
 
@@ -23,7 +25,9 @@ DOCUMENTS = '\n'.join([
     ])
 
 KEYWORDS = ', '.join(["scambi culturali", "comprensione", "erasmus", "tolleranza", "innovazione", "UNESCO", "creatività", "relazioni diplomatiche", "diversità culturale", "collaborazione internazionale"])
-MAX_MODEL_LAYERS = 44
+MAX_MODEL_LAYERS = 33
+df = pd.read_csv('output/bulb.csv')
+
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -33,14 +37,15 @@ def parse_arguments():
     )
     parser.add_argument('-m', '--model_path', action='store', default=os.path.join(os.path.expanduser("~"), 'models', 'llama-2-13b-chat.Q5_K_M.gguf'), type=str, help="model path")
     parser.add_argument('-t', '--n_threads', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use for generation")
-    parser.add_argument('--n_threads_batch', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use for batch processing")
+    parser.add_argument('--n_threads_batch', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use during batch and prompt processing.")
     parser.add_argument('-b', '--n_batch', action='store',  nargs='+', type=int, default=[256, 512], help="Prompt processing maximum batch size")
     parser.add_argument('--ngl', action='store', nargs='+', type=float, default=[0, 0.25, 0.5, 0.75, 1], help="Percentage of layers to store in VRAM")
+    parser.add_argument('-f', '--force', action='store_true', default=False, help="False the test even if the config already exists")
     return parser.parse_args()
 
 def get_llm_config(llm, ngl):
     """Returns the test configuration."""
-    if torch.cuda.is_available() and ngl>0:
+    if torch.cuda.is_available():
         device = torch.cuda.get_device_properties('cuda').name
         VRAM = round(torch.cuda.get_device_properties('cuda').total_memory / 1024 / 1024 / 1024, 2)
         torch.cuda.empty_cache()
@@ -58,7 +63,7 @@ def get_llm_config(llm, ngl):
         "Context Window": llm.n_ctx(),
         "Batch": llm.n_batch,
         "Threads": llm.n_threads,
-        "Batch Threads": llm.n_threads,
+        "Batch Threads": llm.n_threads_batch,
         "GPU Layers": ngl
     }
 
@@ -70,9 +75,9 @@ def get_timings(llm):
         "Prompt Eval Time (s)": timings.t_p_eval_ms / 1000,
         "Eval Time (s)": timings.t_eval_ms / 1000,
         "Total Time (s)": (timings.t_end_ms - timings.t_start_ms) / 1000,
-        "Sample Time (Tk/s)": int((timings.n_sample * 1000) / timings.t_sample_ms),
-        "Prompt Eval Time (Tk/s)": int((timings.n_p_eval * 1000) / timings.t_p_eval_ms),
-        "Eval Time (Tk/s)": int((timings.n_eval * 1000) / timings.t_eval_ms)
+        "Sample Time (Tk/s)": round((timings.n_sample * 1000) / timings.t_sample_ms, 2),
+        "Prompt Eval Time (Tk/s)": round((timings.n_p_eval * 1000) / timings.t_p_eval_ms, 2),
+        "Eval Time (Tk/s)": round((timings.n_eval * 1000) / timings.t_eval_ms, 2)
     }
 
 def get_inference_summary(llm_output, llm):
@@ -82,8 +87,10 @@ def get_inference_summary(llm_output, llm):
         **llm_output["usage"],
         **get_timings(llm)
     }
+
 def run_stress_test(prompt, model_path, n_threads, n_threads_batch, n_batch, ngl):
-    llm = Llama(model_path=model_path, n_gpu_layers=ngl, n_batch=n_batch, n_threads=n_threads, n_threads_batch=n_threads_batch, n_ctx=1100, verbose=False)
+    int_ngl = int(MAX_MODEL_LAYERS*ngl) # convert to the number of layers to offload
+    llm = Llama(model_path=model_path, n_gpu_layers=int_ngl, n_batch=n_batch, n_threads=n_threads, n_threads_batch=n_threads_batch, n_ctx=1100, verbose=False)
 
     # Initialize a StringIO object to capture stderr
     output = llm(
@@ -107,20 +114,44 @@ def main():
     """Main execution function."""
     args = parse_arguments()
 
+    # create the folder that will host the output (if doesn't exists already)
+    os.makedirs('../input', exist_ok=True)
+
+    # create the node id
+    device = 'cpu only' if not torch.cuda.is_available() else torch.cuda.get_device_properties('cuda').name
+    vram = '0' if not torch.cuda.is_available() else str(round(torch.cuda.get_device_properties('cuda').total_memory / 1024 / 1024 / 1024, 2))
+    ram = str(round(psutil.virtual_memory().total / 1024 / 1024 / 1024, 2))
+    n_cpu = str(len(psutil.Process().cpu_affinity()))
+    model_name = os.path.basename(os.path.normpath(args.model_path))
+    node_id = '-'.join([device, vram, ram, n_cpu, model_name])
+
+    # build prompt
     prompt = f"""Ho un dataset contenente i seguenti documenti: \n{DOCUMENTS}\n\nI documenti sono descritti dalle seguenti parole chiave: {KEYWORDS}\n\nIn base a queste informazioni, fai un riassunto di tutto il dataset.\nIl dataset descrive"""
 
-    os.makedirs('../input', exist_ok=True)
+    # safe condition in case GPU is not avalable
     if not torch.cuda.is_available():
-        args.ngl=[0]
+        raise EnvironmentError('cuda not avalable')
 
     for params in itertools.product(args.n_threads, args.n_threads_batch, args.n_batch, args.ngl):
         n_threads, n_threads_batch, n_batch, ngl = params
-        ngl = int(MAX_MODEL_LAYERS*ngl) # convert to the number of layers to offload
-        try:
-            run_stress_test(prompt, args.model_path, n_threads, n_threads_batch, n_batch, ngl)
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            continue
+        int_ngl = int(MAX_MODEL_LAYERS*ngl) # convert to the number of layers to offload
+        
+        # check if the configuration has already been tested on the current machine
+        config_already_tried = not df[(df['Threads'] == n_threads) & 
+                                  (df['Batch Threads'] == n_threads_batch) & 
+                                  (df['Batch'] == n_batch) & 
+                                  (df['GPU Layers'] == ngl) &
+                                  (df['Node ID'] == node_id)].empty
+        
+        if config_already_tried and not args.force:
+            print(f'Configuration already tested on this machine\n\tn_threads: {n_threads}\n\tn_threads_batch: {n_threads_batch}\n\tn_batch: {n_batch}\n\tngl: {ngl} ({int_ngl})\n')
+        else:
+            try:
+                print(n_threads, n_threads_batch, n_batch, int_ngl)
+                run_stress_test(prompt, args.model_path, n_threads, n_threads_batch, n_batch, ngl)
+            except Exception as e:
+                print(f"An error occurred: {e}")
+                continue
 
 if __name__ == "__main__":
     print('Thinking...')
