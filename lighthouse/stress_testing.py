@@ -117,7 +117,7 @@ def run_stress_test(prompt, model_path, n_threads, n_threads_batch, n_batch, ngl
 
     log = {
         'run_name': random_noun_adjective(),
-        'run_time': datetime.now().strftime(%d-%m-%Y %H:%M:%S)
+        'run_time': datetime.now().strftime('%d-%m-%Y %H:%M:%S')
         **get_llm_config(llm, ngl), 
         **get_inference_summary(output, llm)
     }
