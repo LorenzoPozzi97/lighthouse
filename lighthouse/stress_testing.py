@@ -38,10 +38,11 @@ def get_wordnet_word(pos):
 
 def random_noun_adjective():
     noun = get_wordnet_word(wordnet.NOUN)
-    adjective = get_wordnet_word(wordnet.ADJ).replace('-', '_')
-    return f"{adjective}_{noun}"
+    adjective = get_wordnet_word(wordnet.ADJ)
+    return f"{adjective}_{noun}".replace('-', '_')
 
-
+RUN_NAME = random_noun_adjective()
+RUN_TIME = datetime.now().strftime("%d-%m-%Y_%H:%M:%SS")
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -115,15 +116,14 @@ def run_stress_test(prompt, model_path, n_threads, n_threads_batch, n_batch, ngl
         seed=101
         )
 
-    timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%SS")
     log = {
-        'run_name': random_noun_adjective(),
-        'run_time': datetime.now().strftime(timestamp),
+        'run_name': RUN_NAME,
+        'run_time': RUN_TIME,
         **get_llm_config(llm, ngl), 
         **get_inference_summary(output, llm)
     }
     
-    with open(f'input/{timestamp}.json', 'w') as fp:
+    with open(os.path.join('input', f'{RUN_TIME}.json'), 'w') as fp:
         json.dump(log, fp)
 
 def main():

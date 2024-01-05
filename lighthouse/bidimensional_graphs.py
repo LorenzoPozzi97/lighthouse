@@ -65,7 +65,8 @@ def main():
 
     # Show the figure
     fig.show()
-    fig.write_image(f'{args.xaxes}.png')
+    fig.write_image(os.path.join('images', f'{args.xaxes}_{args.node_anchor}.png'))
+    fig.write_html(os.path.join('images', f'{args.xaxes}_{args.node_anchor}.html'))
 
 
 if __name__ == "__main__":

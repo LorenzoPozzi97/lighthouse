@@ -1,7 +1,8 @@
+import os
 import pandas as pd
 import plotly.graph_objects as go
 
-df = pd.read_csv('output/bulb.csv').drop(['id'], axis=1)
+df = pd.read_csv('output/bulb.csv')
 # Create a mapping from model names to numbers
 map_fn = {model: i for i, model in enumerate(df['Model'].unique())}
 columns = ['Model', 'Device', 'CPU Count', 'RAM (GB)', 'VRAM (GB)', 'Model Size (GB)', 'GPU Layers', 
@@ -53,5 +54,6 @@ fig.update_layout(
     height=1000,
 )
 fig.show()
-fig.write_image('ParCoords.png')
-fig.write_html('ParCoords.html')
+os.path.join('images', 'ParCoords.png')
+fig.write_image(os.path.join('images', 'ParCoords.png'))
+fig.write_html(os.path.join('images', 'ParCoords.html'))
