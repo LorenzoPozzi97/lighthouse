@@ -115,14 +115,14 @@ def run_stress_test(prompt, model_path, n_threads, n_threads_batch, n_batch, ngl
         seed=101
         )
 
+    timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%SS")
     log = {
         'run_name': random_noun_adjective(),
-        'run_time': datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+        'run_time': datetime.now().strftime(timestamp),
         **get_llm_config(llm, ngl), 
         **get_inference_summary(output, llm)
     }
-
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    
     with open(f'input/{timestamp}.json', 'w') as fp:
         json.dump(log, fp)
 
@@ -131,7 +131,7 @@ def main():
     args = parse_arguments()
 
     # create the folder that will host the output (if doesn't exists already)
-    os.makedirs('../input', exist_ok=True)
+    os.makedirs('input', exist_ok=True)
 
     # create the node id
     device = 'cpu only' if not torch.cuda.is_available() else torch.cuda.get_device_properties('cuda').name
@@ -162,12 +162,9 @@ def main():
         if config_already_tried and not args.force:
             print(f'Configuration already tested on this machine\n\tn_threads: {n_threads}\n\tn_threads_batch: {n_threads_batch}\n\tn_batch: {n_batch}\n\tngl: {ngl} ({int_ngl})\n')
         else:
-            try:
-                print(n_threads, n_threads_batch, n_batch, int_ngl)
-                run_stress_test(prompt, args.model_path, n_threads, n_threads_batch, n_batch, ngl)
-            except Exception as e:
-                print(f"An error occurred: {e}")
-                continue
+            print(n_threads, n_threads_batch, n_batch, int_ngl)
+            run_stress_test(prompt, args.model_path, n_threads, n_threads_batch, n_batch, ngl)
+           
 
 if __name__ == "__main__":
     print('Thinking...')
