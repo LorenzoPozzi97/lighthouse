@@ -3,6 +3,7 @@ import sys
 import json
 import torch
 import psutil
+import random
 import argparse
 import datetime
 import itertools
@@ -10,6 +11,8 @@ import itertools
 import pandas as pd
 
 #from tqdm import tqdm
+from datetime import datetime
+from nltk.corpus import wordnet
 from llama_cpp import Llama, llama_get_timings
 
 sys.dont_write_bytecode = True
@@ -27,6 +30,17 @@ DOCUMENTS = '\n'.join([
 KEYWORDS = ', '.join(["scambi culturali", "comprensione", "erasmus", "tolleranza", "innovazione", "UNESCO", "creatività", "relazioni diplomatiche", "diversità culturale", "collaborazione internazionale"])
 MAX_MODEL_LAYERS = 33
 df = pd.read_csv('output/bulb.csv')
+
+def get_wordnet_word(pos):
+    """ Get a list of words for a specific part of speech from WordNet. """
+    synset = random.choice(list(wordnet.all_synsets(pos)))
+    return random.choice(synset.lemmas()).name()
+
+def random_noun_adjective():
+    noun = get_wordnet_word(wordnet.NOUN)
+    adjective = get_wordnet_word(wordnet.ADJ).replace('-', '_')
+    return f"{adjective}_{noun}"
+
 
 def parse_arguments():
     """Parse command line arguments."""
@@ -102,6 +116,8 @@ def run_stress_test(prompt, model_path, n_threads, n_threads_batch, n_batch, ngl
         )
 
     log = {
+        'run_name': random_noun_adjective(),
+        'run_time': datetime.now().strftime(%d-%m-%Y %H:%M:%S)
         **get_llm_config(llm, ngl), 
         **get_inference_summary(output, llm)
     }

@@ -65,6 +65,8 @@ def main():
 
     # Show the figure
     fig.show()
+    fig.write_image(f'{args.xaxes}.png')
+
 
 if __name__ == "__main__":
     main()
