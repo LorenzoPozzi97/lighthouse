@@ -28,7 +28,7 @@ DOCUMENTS = '\n'.join([
     ])
 
 KEYWORDS = ', '.join(["scambi culturali", "comprensione", "erasmus", "tolleranza", "innovazione", "UNESCO", "creatività", "relazioni diplomatiche", "diversità culturale", "collaborazione internazionale"])
-MAX_MODEL_LAYERS = 33
+MAX_MODEL_LAYERS = 49
 df = pd.read_csv('output/bulb.csv')
 
 def get_wordnet_word(pos):
@@ -42,7 +42,7 @@ def random_noun_adjective():
     return f"{adjective}_{noun}".replace('-', '_')
 
 RUN_NAME = random_noun_adjective()
-RUN_TIME = datetime.now().strftime("%d-%m-%Y_%H:%M:%SS")
+
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -53,8 +53,8 @@ def parse_arguments():
     parser.add_argument('-m', '--model_path', action='store', default=os.path.join(os.path.expanduser("~"), 'models', 'llama-2-13b-chat.Q5_K_M.gguf'), type=str, help="model path")
     parser.add_argument('-t', '--n_threads', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use for generation")
     parser.add_argument('--n_threads_batch', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use during batch and prompt processing.")
-    parser.add_argument('-b', '--n_batch', action='store',  nargs='+', type=int, default=[256, 512], help="Prompt processing maximum batch size")
-    parser.add_argument('--ngl', action='store', nargs='+', type=float, default=[0, 0.25, 0.5, 0.75, 1], help="Percentage of layers to store in VRAM")
+    parser.add_argument('-b', '--n_batch', action='store',  nargs='+', type=int, default=[512], help="Prompt processing maximum batch size")
+    parser.add_argument('--ngl', action='store', nargs='+', type=float, default=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1], help="Percentage of layers to store in VRAM")
     parser.add_argument('-f', '--force', action='store_true', default=False, help="False the test even if the config already exists")
     return parser.parse_args()
 
@@ -115,15 +115,15 @@ def run_stress_test(prompt, model_path, n_threads, n_threads_batch, n_batch, ngl
         temperature=0.3,
         seed=101
         )
-
+    run_time = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
     log = {
         'run_name': RUN_NAME,
-        'run_time': RUN_TIME,
+        'run_time': run_time,
         **get_llm_config(llm, ngl), 
         **get_inference_summary(output, llm)
     }
-    
-    with open(os.path.join('input', f'{RUN_TIME}.json'), 'w') as fp:
+
+    with open(os.path.join('input', f'{run_time}.json'), 'w') as fp:
         json.dump(log, fp)
 
 def main():

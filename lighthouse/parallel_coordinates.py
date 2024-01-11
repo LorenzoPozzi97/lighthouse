@@ -49,8 +49,8 @@ fig = go.Figure(data=
 
 
 fig.update_layout(
-    margin=dict(l=270, r=150, t=250, b=50),
-    width=2000, 
+    margin=dict(l=380, r=150, t=250, b=50),
+    width=2000,
     height=1000,
 )
 fig.show()

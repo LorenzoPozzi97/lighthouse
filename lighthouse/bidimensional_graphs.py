@@ -16,10 +16,11 @@ def parse_arguments():
         description='Generate 2D interactive graphs of LLM inference performance.',
     )
     parser.add_argument('-x', '--xaxes', action='store', default='GPU Layers', choices=['GPU Layers', 'Threads', 'Batch Threads'], type=str, help="x axes parameter")
-    parser.add_argument('--node_anchor', action='store', type=str, required=True, help="anchor value for current machine and model")
-    parser.add_argument('--threads_anchor', action='store', default=-1, type=int, help="anchor value for number of threads")
-    parser.add_argument('--batch_threads_anchor', action='store', default=-1, type=int, help="anchor value for number of batch threads")
-    parser.add_argument('--gpu_anchor', action='store', default=-1, type=float, help="anchor value for number of threads")
+    parser.add_argument('--run_anchor', action='store', type=str, required=True, help="anchor value for run name")
+    # parser.add_argument('--node_anchor', action='store', type=str, required=True, help="anchor value for current machine and model")
+    # parser.add_argument('--threads_anchor', action='store', default=-1, type=int, help="anchor value for number of threads")
+    # parser.add_argument('--batch_threads_anchor', action='store', default=-1, type=int, help="anchor value for number of batch threads")
+    # parser.add_argument('--gpu_anchor', action='store', default=-1, type=float, help="anchor value for number of threads")
 
     return parser.parse_args()
 
@@ -28,15 +29,17 @@ def main():
     args = parse_arguments()
 
     df = pd.read_csv('output/bulb.csv').drop(['id'], axis=1)
-    threads_filter = df['Threads'] == args.threads_anchor if args.threads_anchor!=-1 else df['Threads'] == df['Threads']
-    batch_threads_filter = df['Batch Threads'] == args.batch_threads_anchor if args.batch_threads_anchor!=-1 else df['Batch Threads'] == df['Batch Threads']
-    gpu_filter = df['GPU Layers'] == args.gpu_anchor if args.gpu_anchor!=-1 else df['GPU Layers'] == df['GPU Layers']
+    filtered_df = df[(df['run_name']==args.run_anchor)]
+    node_id = filtered_df['Node ID'].iloc[0]
+    # threads_filter = df['Threads'] == args.threads_anchor if args.threads_anchor!=-1 else df['Threads'] == df['Threads']
+    # batch_threads_filter = df['Batch Threads'] == args.batch_threads_anchor if args.batch_threads_anchor!=-1 else df['Batch Threads'] == df['Batch Threads']
+    # gpu_filter = df['GPU Layers'] == args.gpu_anchor if args.gpu_anchor!=-1 else df['GPU Layers'] == df['GPU Layers']
 
-    filtered_df = df[(df['Node ID']==args.node_anchor) & 
-                    threads_filter &
-                    batch_threads_filter &
-                    gpu_filter
-                    ]
+    # filtered_df = df[(df['Node ID']==args.node_anchor) & 
+    #                 threads_filter &
+    #                 batch_threads_filter &
+    #                 gpu_filter
+    #                 ]
 
     # Create a subplot figure with 1 row and 2 columns
     fig = make_subplots(rows=3, cols=1,
@@ -65,8 +68,8 @@ def main():
 
     # Show the figure
     fig.show()
-    fig.write_image(os.path.join('images', f'{args.xaxes}_{args.node_anchor}.png'))
-    fig.write_html(os.path.join('images', f'{args.xaxes}_{args.node_anchor}.html'))
+    fig.write_image(os.path.join('images', f'{args.xaxes}_{node_id}.png'))
+    fig.write_html(os.path.join('images', f'{args.xaxes}_{node_id}.html'))
 
 
 if __name__ == "__main__":
