@@ -60,7 +60,7 @@ def main():
 
     fig.update_yaxes(title_text="Prompt Eval Time (Tk/s)", row=1, col=1)
     fig.update_yaxes(title_text="Eval Time (Tk/s)", row=2, col=1)
-    fig.update_yaxes(title_text="Total Time (s)", row=3, col=1)
+    fig.update_yaxes(title_text="Latency (s)", row=3, col=1)
     fig.update_xaxes(title_text=args.xaxes, row=3, col=1)
 
     # Update layout if needed
