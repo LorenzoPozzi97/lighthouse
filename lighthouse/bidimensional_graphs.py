@@ -16,7 +16,7 @@ def parse_arguments():
         description='Generate 2D interactive graphs of LLM inference performance.',
     )
     parser.add_argument('-x', '--xaxes', action='store', default='GPU Layers', choices=['GPU Layers', 'Threads', 'Batch Threads'], type=str, help="x axes parameter")
-    parser.add_argument('--run_anchor', action='store', type=str, required=True, help="anchor value for run name")
+    parser.add_argument('--run_anchor', action='store', nargs='+', type=str, required=True, help="anchor value for run name")
     # parser.add_argument('--node_anchor', action='store', type=str, required=True, help="anchor value for current machine and model")
     # parser.add_argument('--threads_anchor', action='store', default=-1, type=int, help="anchor value for number of threads")
     # parser.add_argument('--batch_threads_anchor', action='store', default=-1, type=int, help="anchor value for number of batch threads")
@@ -29,8 +29,12 @@ def main():
     args = parse_arguments()
 
     df = pd.read_csv('output/bulb.csv').drop(['id'], axis=1)
-    filtered_df = df[(df['run_name']==args.run_anchor)]
-    node_id = filtered_df['Node ID'].iloc[0]
+
+     # Create a subplot figure with 1 row and 2 columns
+    fig = make_subplots(rows=3, cols=1,
+                        shared_xaxes=True,
+                        vertical_spacing=0.02)
+    
     # threads_filter = df['Threads'] == args.threads_anchor if args.threads_anchor!=-1 else df['Threads'] == df['Threads']
     # batch_threads_filter = df['Batch Threads'] == args.batch_threads_anchor if args.batch_threads_anchor!=-1 else df['Batch Threads'] == df['Batch Threads']
     # gpu_filter = df['GPU Layers'] == args.gpu_anchor if args.gpu_anchor!=-1 else df['GPU Layers'] == df['GPU Layers']
@@ -40,23 +44,37 @@ def main():
     #                 batch_threads_filter &
     #                 gpu_filter
     #                 ]
+    for run_anchor in args.run_anchor:        
+        filtered_df = df[(df['run_name']==run_anchor)]
 
-    # Create a subplot figure with 1 row and 2 columns
-    fig = make_subplots(rows=3, cols=1,
-                        shared_xaxes=True,
-                        vertical_spacing=0.02)
-    fig.add_trace(
-        go.Scatter(x=filtered_df[args.xaxes], y=filtered_df["Prompt Eval Time (Tk/s)"], mode='markers', name=''),
-        row=1, col=1
-    )
-    fig.add_trace(
-        go.Scatter(x=filtered_df[args.xaxes], y=filtered_df["Eval Time (Tk/s)"], mode='markers', name=''),
-        row=2, col=1
-    )
-    fig.add_trace(
-        go.Scatter(x=filtered_df[args.xaxes], y=filtered_df["Total Time (s)"], mode='markers', name=''),
-        row=3, col=1
-    )
+        fig.add_trace(
+            go.Scatter(
+                x=filtered_df[args.xaxes],
+                y=filtered_df["Prompt Eval Time (Tk/s)"],
+                hovertemplate='%{y:.2f}',
+                mode='markers',
+                name=f'{run_anchor}'),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=filtered_df[args.xaxes],
+                y=filtered_df["Eval Time (Tk/s)"],
+                hovertemplate='%{y:.2f}',
+                mode='markers',
+                name=f'{run_anchor}'),
+            row=2, col=1
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=filtered_df[args.xaxes],
+                y=filtered_df["Total Time (s)"],
+                customdata=filtered_df[["Load Time (s)", "Sample Time (s)", "Prompt Eval Time (s)", "Eval Time (s)"]].to_numpy(),
+                hovertemplate='<b>Total Time: %{y:.2f}</b> <br>Load Time: %{customdata[0]:.1f} <br>Sample Time: %{customdata[1]:.1f} <br>Prompt Eval Time: %{customdata[2]:.1f} <br>Eval Time: %{customdata[3]:.1f}',
+                mode='markers',
+                name=f'{run_anchor}'),
+            row=3, col=1
+        )
 
     fig.update_yaxes(title_text="Prompt Eval Time (Tk/s)", row=1, col=1)
     fig.update_yaxes(title_text="Eval Time (Tk/s)", row=2, col=1)
@@ -65,6 +83,7 @@ def main():
 
     # Update layout if needed
     fig.update_layout(height=700, width=500, showlegend=False)
+    node_id = filtered_df['Node ID'].iloc[0]
 
     # Show the figure
     fig.show()

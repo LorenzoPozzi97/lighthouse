@@ -151,20 +151,20 @@ def main():
     for params in itertools.product(args.n_threads, args.n_threads_batch, args.n_batch, args.ngl):
         n_threads, n_threads_batch, n_batch, ngl = params
         int_ngl = int(MAX_MODEL_LAYERS*ngl) # convert to the number of layers to offload
-        
+
         # check if the configuration has already been tested on the current machine
         config_already_tried = not df[(df['Threads'] == n_threads) & 
                                   (df['Batch Threads'] == n_threads_batch) & 
                                   (df['Batch'] == n_batch) & 
                                   (df['GPU Layers'] == ngl) &
                                   (df['Node ID'] == node_id)].empty
-        
+
         if config_already_tried and not args.force:
             print(f'Configuration already tested on this machine\n\tn_threads: {n_threads}\n\tn_threads_batch: {n_threads_batch}\n\tn_batch: {n_batch}\n\tngl: {ngl} ({int_ngl})\n')
         else:
             print(n_threads, n_threads_batch, n_batch, int_ngl)
             run_stress_test(prompt, args.model_path, n_threads, n_threads_batch, n_batch, ngl)
-           
+
 
 if __name__ == "__main__":
     print('Thinking...')
