@@ -23,5 +23,6 @@ pip install auto-gptq==0.6.0
 pip install ninja==1.11.1.1
 MAX_JOBS=4 pip install flash-attn==2.4.2 --no-build-isolation
 pip install transformers==4.36.2
+pip install einops==0.7.0
 
 echo "Virtual environment and packages installed successfully."

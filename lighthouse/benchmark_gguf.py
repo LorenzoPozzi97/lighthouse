@@ -15,19 +15,9 @@ from datetime import datetime
 from nltk.corpus import wordnet
 from llama_cpp import Llama, llama_get_timings
 
+random.seed(101)
 sys.dont_write_bytecode = True
 
-DOCUMENTS = '\n'.join([
-    "Gli scambi culturali arricchiscono la nostra comprensione del mondo; per esempio, il programma Erasmus ha permesso a oltre 3 milioni di studenti europei di studiare all'estero, esplorando nuove culture e ampliando le loro prospettive.",
-    "Attraverso l'esperienza degli scambi culturali, impariamo a sfidare i nostri pregiudizi e stereotipi; studi hanno dimostrato che gli studenti che studiano all'estero sviluppano una maggiore tolleranza e una mente più aperta.",
-    "La condivisione delle arti, della musica e della letteratura nelle esperienze di scambio culturale crea ponti di comunicazione; festival come il Carnevale di Rio coinvolgono persone da tutto il mondo, celebrando la diversità culturale attraverso la musica e la danza.",
-    "Gli scambi culturali promuovono la collaborazione e l'innovazione; programmi come Fulbright hanno finanziato oltre 380.000 studiosi e professionisti, favorirendo scambi accademici e professionali tra 160 paesi.",
-    "Partecipare a scambi culturali aiuta i giovani a sviluppare competenze globali; secondo l'UNESCO, gli studenti che partecipano a programmi di scambio sono più propensi a sviluppare capacità di problem solving in contesti multiculturali.",
-    "L'interazione diretta con diverse culture attraverso gli scambi culturali può ispirare creatività e nuove idee; molti innovatori e artisti famosi, come Steve Jobs, hanno citato i viaggi e l'esposizione a diverse culture come fonte di ispirazione.",
-    "Gli scambi culturali sono vitali per costruire una comunità globale più pacifica; secondo il Dipartimento di Stato degli Stati Uniti, i programmi di scambio culturale hanno contribuito a migliorare le relazioni diplomatiche e a ridurre i conflitti internazionali.",
-    ])
-
-KEYWORDS = ', '.join(["scambi culturali", "comprensione", "erasmus", "tolleranza", "innovazione", "UNESCO", "creatività", "relazioni diplomatiche", "diversità culturale", "collaborazione internazionale"])
 MAX_MODEL_LAYERS = 49
 df = pd.read_csv('output/bulb.csv')
 
@@ -50,12 +40,15 @@ def parse_arguments():
         description='The script test perforance of LLM models in inference.',
         epilog='Text at the bottom of help'
     )
-    parser.add_argument('-m', '--model_path', action='store', default=os.path.join(os.path.expanduser("~"), 'models', 'llama-2-13b-chat.Q5_K_M.gguf'), type=str, help="model path")
-    parser.add_argument('-t', '--n_threads', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use for generation")
+    parser.add_argument('--model_path', action='store', default=os.path.join(os.path.expanduser("~"), 'models', 'llama-2-13b-chat.Q5_K_M.gguf'), type=str, help="Model path.")
+    parser.add_argument('--n_threads', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use for generation.")
     parser.add_argument('--n_threads_batch', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use during batch and prompt processing.")
-    parser.add_argument('-b', '--n_batch', action='store',  nargs='+', type=int, default=[512], help="Prompt processing maximum batch size")
-    parser.add_argument('--ngl', action='store', nargs='+', type=float, default=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1], help="Percentage of layers to store in VRAM")
-    parser.add_argument('-f', '--force', action='store_true', default=False, help="False the test even if the config already exists")
+    parser.add_argument('--n_batch', action='store',  nargs='+', type=int, default=[512], help="Prompt processing maximum batch size.")
+    parser.add_argument('--ngl', action='store', nargs='+', type=float, default=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1], help="Percentage of layers to store in VRAM.")
+    parser.add_argument('--force', action='store_true', default=False, help="False the test even if the config already exists.")
+    parser.add_argument("--prompt_length", type=int, default=100, help="Length of the prompt.")
+    parser.add_argument("--new_tokens", type=int, default=100, help="Length of the generation.")
+    parser.add_argument("--k_folds", type=int, default=1, help="Number of repeated tests")
     return parser.parse_args()
 
 def get_llm_config(llm, ngl):
@@ -90,37 +83,58 @@ def get_timings(llm):
         "Prompt Eval Time (s)": timings.t_p_eval_ms / 1000,
         "Eval Time (s)": timings.t_eval_ms / 1000,
         "Total Time (s)": (timings.t_end_ms - timings.t_start_ms) / 1000,
-        "Sample Time (Tk/s)": round((timings.n_sample * 1000) / timings.t_sample_ms, 2),
-        "Prompt Eval Time (Tk/s)": round((timings.n_p_eval * 1000) / timings.t_p_eval_ms, 2),
-        "Eval Time (Tk/s)": round((timings.n_eval * 1000) / timings.t_eval_ms, 2)
+        "Sample Time (Tk/s)": (timings.n_sample * 1000) / timings.t_sample_ms,
+        "Prompt Eval Time (Tk/s)": (timings.n_p_eval * 1000) / timings.t_p_eval_ms,
+        "Eval Time (Tk/s)": (timings.n_eval * 1000) / timings.t_eval_ms
     }
 
-def get_inference_summary(llm_output, llm):
-    """Generates output for a single document."""
-    return {
-        "id": llm_output["id"],
-        **llm_output["usage"],
-        **get_timings(llm)
-    }
-
-def run_stress_test(prompt, model_path, n_threads, n_threads_batch, n_batch, ngl):
+def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batch, ngl, new_tokens, k_folds):
     int_ngl = int(MAX_MODEL_LAYERS*ngl) # convert to the number of layers to offload
     llm = Llama(model_path=model_path, n_gpu_layers=int_ngl, n_batch=n_batch, n_threads=n_threads, n_threads_batch=n_threads_batch, n_ctx=1100, verbose=False)
+    prompt = [random.randint(1, llm._model.n_vocab()) for _ in range(prompt_length+1)]
 
-    # Initialize a StringIO object to capture stderr
-    output = llm(
-        prompt, 
-        max_tokens=500, 
-        stop=["\n"], 
-        temperature=0.3,
-        seed=101
-        )
+    load_times = []
+    sample_times = []
+    prompt_eval_times = []
+    eval_times = []
+    total_times = []
+    sample_tks = []
+    prompt_eval_tks = []
+    eval_tks = []
+
+    for i in range(k_folds):
+        output = llm(
+            prompt, 
+            max_tokens=new_tokens,
+            logit_bias={llm._token_eos: float('-inf')},
+            temperature=0.3,
+            seed=101
+            )
+        timings = get_timings(llm)
+        load_times.append(timings["Load Time (s)"])
+        sample_times.append(timings["Sample Time (s)"])
+        prompt_eval_times.append(timings["Prompt Eval Time (s)"])
+        eval_times.append(timings["Eval Time (s)"])
+        total_times.append(timings["Total Time (s)"])
+        sample_tks.append(timings["Sample Time (Tk/s)"])
+        prompt_eval_tks.append(timings["Prompt Eval Time (Tk/s)"])
+        eval_tks.append(timings["Eval Time (Tk/s)"])
+
     run_time = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
     log = {
+        "id": output["id"],
         'run_name': RUN_NAME,
         'run_time': run_time,
         **get_llm_config(llm, ngl), 
-        **get_inference_summary(output, llm)
+        **output["usage"],
+        "Load Time (s)": sum(load_times) / len(load_times),
+        "Sample Time (s)": sum(sample_times) / len(sample_times),
+        "Prompt Eval Time (s)": sum(prompt_eval_times) / len(prompt_eval_times),
+        "Eval Time (s)": sum(eval_times) / len(eval_times),
+        "Total Time (s)": round(sum(total_times) / len(total_times), 2),
+        "Sample Time (Tk/s)": round(sum(sample_tks) / len(sample_tks), 2),
+        "Prompt Eval Time (Tk/s)": round(sum(prompt_eval_tks) / len(prompt_eval_tks), 2),
+        "Eval Time (Tk/s)": round(sum(eval_tks) / len(eval_tks), 2)
     }
 
     with open(os.path.join('input', f'{run_time}.json'), 'w') as fp:
@@ -141,9 +155,6 @@ def main():
     model_name = os.path.basename(os.path.normpath(args.model_path))
     node_id = '-'.join([device, vram, ram, n_cpu, model_name])
 
-    # build prompt
-    prompt = f"""Ho un dataset contenente i seguenti documenti: \n{DOCUMENTS}\n\nI documenti sono descritti dalle seguenti parole chiave: {KEYWORDS}\n\nIn base a queste informazioni, fai un riassunto di tutto il dataset.\nIl dataset descrive"""
-
     # safe condition in case GPU is not avalable
     if not torch.cuda.is_available():
         raise EnvironmentError('cuda not avalable')
@@ -163,7 +174,7 @@ def main():
             print(f'Configuration already tested on this machine\n\tn_threads: {n_threads}\n\tn_threads_batch: {n_threads_batch}\n\tn_batch: {n_batch}\n\tngl: {ngl} ({int_ngl})\n')
         else:
             print(n_threads, n_threads_batch, n_batch, int_ngl)
-            run_stress_test(prompt, args.model_path, n_threads, n_threads_batch, n_batch, ngl)
+            benchmark_gguf(args.prompt_length-1, args.model_path, n_threads, n_threads_batch, n_batch, ngl, args.new_tokens, args.k_folds)
 
 
 if __name__ == "__main__":

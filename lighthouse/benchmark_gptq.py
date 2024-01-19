@@ -30,8 +30,8 @@ def parse_arguments():
     parser.add_argument("--batch-size", type=int, default=1, help="")
     parser.add_argument("--task", type=str, default=None, help="Task")
     parser.add_argument("--model", type=str, help="Model to benchmark")
-    parser.add_argument("--prompt-length", type=int, default=256, help="") # remove
-    parser.add_argument("--new-tokens", type=int, default=256, help="") # remove
+    parser.add_argument("--prompt-length", type=int, default=256, help="")
+    parser.add_argument("--new-tokens", type=int, default=256, help="")
     parser.add_argument("--prefill", action="store_true", help="For decoder models, benchmark only the prefill step with `prompt_length`.")
     parser.add_argument("--gptq", action="store_true", help="Indicate that the model to benchmark is a GPTQ model.")
     parser.add_argument("--bitsandbytes", action="store_true", help="Indicate that the model uses bitsandbytes through transformers load_in_4bit=True.")
@@ -222,7 +222,7 @@ if len(os.environ["CUDA_VISIBLE_DEVICES"].split(",")) != 1:
 device = torch.device("cuda:0")
 memory_tracker = MemoryTracker()
 
-tokenizer = AutoTokenizer.from_pretrained(args.model, revision=args.revision, use_fast=False)
+tokenizer = AutoTokenizer.from_pretrained(args.model, revision=args.revision, use_fast=False, trust_remote_code=True)
 
 if not hasattr(tokenizer, "pad_token") or tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
@@ -255,17 +255,18 @@ if args.gptq:
         quantization_config=quantization_config,
         torch_dtype=torch.float16,
         device_map="auto",
+        trust_remote_code=True,
     )
 elif args.bitsandbytes:
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True, bnb_4bit_quant_type="fp4", bnb_4bit_compute_dtype=torch.float16
     )
     model = autoclass.from_pretrained(
-        args.model, quantization_config=quantization_config, device_map="auto", torch_dtype=torch.float16
+        args.model, quantization_config=quantization_config, device_map="auto", torch_dtype=torch.float16, trust_remote_code=True
     )
 else:
     with device:
-        model = autoclass.from_pretrained(args.model, torch_dtype=torch.float16)
+        model = autoclass.from_pretrained(args.model, torch_dtype=torch.float16, trust_remote_code=True)
 torch.cuda.synchronize()
 load_end = time.time_ns()
 
