@@ -14,7 +14,7 @@ def parse_arguments():
         prog='2D-plots',
         description='Generate 2D interactive graphs of LLM inference performance.',
     )
-    parser.add_argument('-x', '--xaxes', action='store', default='GPU Layers', choices=['GPU Layers', 'Threads', 'Batch Threads'], type=str, help="x axes parameter")
+    parser.add_argument('-x', '--xaxes', action='store', default='GPU Layers', choices=['GPU Layers', 'Threads', 'Batch Threads', 'Prompt Length'], type=str, help="x axes parameter")
     parser.add_argument('--run_anchor', action='store', nargs='+', type=str, required=True, help="anchor value for run name")
     # parser.add_argument('--node_anchor', action='store', type=str, required=True, help="anchor value for current machine and model")
     # parser.add_argument('--threads_anchor', action='store', default=-1, type=int, help="anchor value for number of threads")
@@ -70,7 +70,7 @@ def main():
                 x=filtered_df[args.xaxes],
                 y=filtered_df["Total Time (s)"],
                 customdata=filtered_df[["Load Time (s)", "Sample Time (s)", "Prompt Eval Time (s)", "Eval Time (s)"]].to_numpy(),
-                hovertemplate='<b>Total Time: %{y:.2f}</b> <br>Load Time: %{customdata[0]:.1f} <br>Sample Time: %{customdata[1]:.1f} <br>Prompt Eval Time: %{customdata[2]:.1f} <br>Eval Time: %{customdata[3]:.1f}',
+                hovertemplate='<b>Total Time: %{y:.2f}</b> <br>Load Time: %{customdata[0]:.1f} <br>Sample Time: %{customdata[1]:.2f} <br>Prompt Eval Time: %{customdata[2]:.1f} <br>Eval Time: %{customdata[3]:.1f}',
                 mode='markers',
                 name=f'{run_anchor}'),
             row=3, col=1

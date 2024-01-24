@@ -33,7 +33,7 @@ def get_wordnet_word(pos):
 def random_noun_adjective():
     noun = get_wordnet_word(wordnet.NOUN)
     adjective = get_wordnet_word(wordnet.ADJ)
-    return f"{adjective}_{noun}".replace('-', '_')
+    return f"{adjective}_{noun}".replace('-', '_').replace('\'', '_')
 
 RUN_NAME = random_noun_adjective()
 
@@ -50,8 +50,9 @@ def parse_arguments():
     parser.add_argument('--n_batch', action='store',  nargs='+', type=int, default=[512], help="Prompt processing maximum batch size.")
     parser.add_argument('--ngl', action='store', nargs='+', type=float, default=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1], help="Percentage of layers to store in VRAM.")
     parser.add_argument('--force', action='store_true', default=False, help="False the test even if the config already exists.")
-    parser.add_argument("--prompt_length", nargs='+', type=int, default=[500], help="Length of the prompt.")
+    parser.add_argument("--prompt_length", nargs='+', type=int, default=[500], help="Length of the prompt (ratio fro te context window menus new_tokens).")
     parser.add_argument("--new_tokens", nargs='+', type=int, default=[100], help="Length of the generation.")
+    parser.add_argument("--ctx", type=int, default=1100, help="Context window.")
     parser.add_argument("--k_folds", type=int, default=1, help="Number of repeated tests.")
     parser.add_argument("--memo", type=str, default='', help="Description of the experiment.")
     return parser.parse_args()
@@ -92,11 +93,12 @@ def get_timings(llm):
         "Eval Time (Tk/s)": (timings.n_eval * 1000) / timings.t_eval_ms
     }
 
-def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batch, ngl, new_tokens, k_folds, p_ngl, memo):
-    print(os.path.basename(os.path.normpath(model_path)), n_threads, n_threads_batch, n_batch, ngl)
+def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batch, ngl, new_tokens, k_folds, p_ngl, memo, ctx):
+    print(os.path.basename(os.path.normpath(model_path)), n_threads, n_threads_batch, n_batch, ngl, prompt_length)
 
-    llm = Llama(model_path=model_path, n_gpu_layers=ngl, n_batch=n_batch, n_threads=n_threads, n_threads_batch=n_threads_batch, n_ctx=1100, verbose=True)
+    llm = Llama(model_path=model_path, n_gpu_layers=ngl, n_batch=n_batch, n_threads=n_threads, n_threads_batch=n_threads_batch, n_ctx=ctx, verbose=True)
     prompt = np.random.randint(1, llm._model.n_vocab(), size=prompt_length).tolist()
+    print(len(prompt))
 
     load_times = []
     sample_times = []
@@ -133,6 +135,7 @@ def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batc
         "run_time": run_time,
         **get_llm_config(llm),
         "GPU Layers": p_ngl,
+        "Context Window": ctx,
         "Prompt Length": prompt_length+1,
         "New Tokens": new_tokens,
         "Load Time (s)": sum(load_times) / len(load_times),
@@ -155,18 +158,10 @@ def main():
     # create the folder that will host the output (if doesn't exists already)
     os.makedirs('input', exist_ok=True)
 
-    # create the node id
-    # device = 'cpu only' if not torch.cuda.is_available() else torch.cuda.get_device_properties('cuda').name
-    # vram = '0' if not torch.cuda.is_available() else str(round(torch.cuda.get_device_properties('cuda').total_memory / 1024 / 1024 / 1024, 2))
-    # ram = str(round(psutil.virtual_memory().total / 1024 / 1024 / 1024, 2))
-    # n_cpu = str(len(psutil.Process().cpu_affinity()))
-    # model_name = os.path.basename(os.path.normpath(args.model_path))
-    # node_id = '-'.join([device, vram, ram, n_cpu, model_name])
-
     # safe condition in case GPU is not avalable
     if not torch.cuda.is_available():
         raise EnvironmentError('cuda not avalable')
-    print()
+
     for params in itertools.product(args.n_threads, args.n_threads_batch, args.n_batch, args.ngl, args.prompt_length, args.new_tokens):
         n_threads, n_threads_batch, n_batch, ngl, prompt_length, new_tokens = params
         model_path = os.path.join(MODELS_DIR, args.model_path)
@@ -181,7 +176,7 @@ def main():
         if config_already_tried and not args.force:
             print(f'Configuration already tested on this machine\n\tn_threads: {n_threads}\n\tn_threads_batch: {n_threads_batch}\n\tn_batch: {n_batch}\n\tngl: {ngl} ({ngl})\n')
         else:
-            benchmark_gguf(prompt_length-1, model_path, n_threads, n_threads_batch, n_batch, int_ngl, new_tokens, args.k_folds, ngl, args.memo)
+            benchmark_gguf(prompt_length-1, model_path, n_threads, n_threads_batch, n_batch, int_ngl, new_tokens, args.k_folds, ngl, args.memo, args.ctx)
 
 
 if __name__ == "__main__":

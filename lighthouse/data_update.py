@@ -1,5 +1,6 @@
 # load all .out from a folder
-
+# TODO
+# Add optin to add or deletae runs
 # create or update an existing dataframe
 
 import pandas as pd

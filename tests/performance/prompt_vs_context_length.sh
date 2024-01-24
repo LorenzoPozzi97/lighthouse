@@ -1,0 +1,4 @@
+# Run stress test at different prompt legth and two context length (greater will give OOM)
+
+python /home/navya/Git/lighthouse/lighthouse/benchmark_gguf.py --model_path mistral-7b-instruct-v0.2.Q5_K_M.gguf --prompt_length 140 280 420 560 700 840 980 1120 1260 1400 --ngl 0.7 --force --memo 'Test at different prompt lengths and 1500  context' --ctx 1500   
+python /home/navya/Git/lighthouse/lighthouse/benchmark_gguf.py --model_path mistral-7b-instruct-v0.2.Q5_K_M.gguf --prompt_length 240 480 720 960 1200 1440 1680 1920 2160 2400 --ngl 0.7 --force --memo 'Test at different prompt lengths and 2400  context' --ctx 2400
