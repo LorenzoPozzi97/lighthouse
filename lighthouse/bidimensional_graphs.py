@@ -33,7 +33,7 @@ def main():
     fig = make_subplots(rows=3, cols=1,
                         shared_xaxes=True,
                         vertical_spacing=0.02)
-    
+
     # threads_filter = df['Threads'] == args.threads_anchor if args.threads_anchor!=-1 else df['Threads'] == df['Threads']
     # batch_threads_filter = df['Batch Threads'] == args.batch_threads_anchor if args.batch_threads_anchor!=-1 else df['Batch Threads'] == df['Batch Threads']
     # gpu_filter = df['GPU Layers'] == args.gpu_anchor if args.gpu_anchor!=-1 else df['GPU Layers'] == df['GPU Layers']
@@ -43,8 +43,9 @@ def main():
     #                 batch_threads_filter &
     #                 gpu_filter
     #                 ]
+
     for run_anchor in args.run_anchor:        
-        filtered_df = df[(df['run_name']==run_anchor)]
+        filtered_df = df[(df['Run Name']==run_anchor)]
 
         fig.add_trace(
             go.Scatter(
@@ -82,12 +83,12 @@ def main():
 
     # Update layout if needed
     fig.update_layout(height=700, width=500, showlegend=False)
-    node_id = filtered_df['Node ID'].iloc[0]
+    fig_name = '_'.join([args.xaxes, '_'.join(set(df[df["Run Name"].isin(args.run_anchor)]["Device"])), '_'.join(set(df[df["Run Name"].isin(args.run_anchor)]["Model"]))])
 
     # Show the figure
     fig.show()
-    fig.write_image(os.path.join('images', f'{args.xaxes}_{node_id}.png'))
-    fig.write_html(os.path.join('images', f'{args.xaxes}_{node_id}.html'))
+    fig.write_image(os.path.join('images', f'{fig_name}.png'))
+    fig.write_html(os.path.join('images', f'{fig_name}.html'))
 
 
 if __name__ == "__main__":

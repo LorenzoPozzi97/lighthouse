@@ -5,8 +5,8 @@ import plotly.graph_objects as go
 df = pd.read_csv('output/bulb.csv')
 # Create a mapping from model names to numbers
 map_fn = {model: i for i, model in enumerate(df['Model'].unique())}
-columns = ['Model', 'Device', 'CPU Count', 'RAM (GB)', 'VRAM (GB)', 'Model Size (GB)', 'GPU Layers', 
-           'Batch', 'Threads', 'Batch Threads', 'Sample Time (Tk/s)', 'Prompt Eval Time (Tk/s)', 
+columns = ['Model', 'Run Name', 'Device', 'CPU Count', 'RAM (GB)', 'VRAM (GB)', 'Model Size (GB)', 'GPU Layers', 
+           'Batch', 'Threads', 'Batch Threads', 'Prompt Length', 'New Tokens', 'Sample Time (Tk/s)', 'Prompt Eval Time (Tk/s)', 
            'Eval Time (Tk/s)']
 
 df = df[columns]

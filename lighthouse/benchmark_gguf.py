@@ -1,3 +1,6 @@
+# TODO
+# fix kfold
+
 import os
 import sys
 import json
@@ -8,6 +11,7 @@ import argparse
 import datetime
 import itertools
 
+import numpy as np
 import pandas as pd
 
 #from tqdm import tqdm
@@ -15,10 +19,10 @@ from datetime import datetime
 from nltk.corpus import wordnet
 from llama_cpp import Llama, llama_get_timings
 
-random.seed(101)
+np.random.seed(101)
 sys.dont_write_bytecode = True
 
-MAX_MODEL_LAYERS = 49
+MODELS_DIR = os.path.join(os.path.expanduser("~"), 'models')
 df = pd.read_csv('output/bulb.csv')
 
 def get_wordnet_word(pos):
@@ -40,18 +44,19 @@ def parse_arguments():
         description='The script test perforance of LLM models in inference.',
         epilog='Text at the bottom of help'
     )
-    parser.add_argument('--model_path', action='store', default=os.path.join(os.path.expanduser("~"), 'models', 'llama-2-13b-chat.Q5_K_M.gguf'), type=str, help="Model path.")
+    parser.add_argument('--model_path', action='store', type=str, default=os.path.join(os.path.expanduser("~"), 'models', 'llama-2-13b-chat.Q5_K_M.gguf'), help="Model path.")
     parser.add_argument('--n_threads', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use for generation.")
     parser.add_argument('--n_threads_batch', action='store',  nargs='+', type=int, default=[10], help="Number of threads to use during batch and prompt processing.")
     parser.add_argument('--n_batch', action='store',  nargs='+', type=int, default=[512], help="Prompt processing maximum batch size.")
     parser.add_argument('--ngl', action='store', nargs='+', type=float, default=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1], help="Percentage of layers to store in VRAM.")
     parser.add_argument('--force', action='store_true', default=False, help="False the test even if the config already exists.")
-    parser.add_argument("--prompt_length", type=int, default=100, help="Length of the prompt.")
-    parser.add_argument("--new_tokens", type=int, default=100, help="Length of the generation.")
-    parser.add_argument("--k_folds", type=int, default=1, help="Number of repeated tests")
+    parser.add_argument("--prompt_length", nargs='+', type=int, default=[500], help="Length of the prompt.")
+    parser.add_argument("--new_tokens", nargs='+', type=int, default=[100], help="Length of the generation.")
+    parser.add_argument("--k_folds", type=int, default=1, help="Number of repeated tests.")
+    parser.add_argument("--memo", type=str, default='', help="Description of the experiment.")
     return parser.parse_args()
 
-def get_llm_config(llm, ngl):
+def get_llm_config(llm):
     """Returns the test configuration."""
     if torch.cuda.is_available():
         device = torch.cuda.get_device_properties('cuda').name
@@ -71,8 +76,7 @@ def get_llm_config(llm, ngl):
         "Context Window": llm.n_ctx(),
         "Batch": llm.n_batch,
         "Threads": llm.n_threads,
-        "Batch Threads": llm.n_threads_batch,
-        "GPU Layers": ngl
+        "Batch Threads": llm.n_threads_batch
     }
 
 def get_timings(llm):
@@ -88,10 +92,11 @@ def get_timings(llm):
         "Eval Time (Tk/s)": (timings.n_eval * 1000) / timings.t_eval_ms
     }
 
-def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batch, ngl, new_tokens, k_folds):
-    int_ngl = int(MAX_MODEL_LAYERS*ngl) # convert to the number of layers to offload
-    llm = Llama(model_path=model_path, n_gpu_layers=int_ngl, n_batch=n_batch, n_threads=n_threads, n_threads_batch=n_threads_batch, n_ctx=1100, verbose=False)
-    prompt = [random.randint(1, llm._model.n_vocab()) for _ in range(prompt_length+1)]
+def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batch, ngl, new_tokens, k_folds, p_ngl, memo):
+    print(os.path.basename(os.path.normpath(model_path)), n_threads, n_threads_batch, n_batch, ngl)
+
+    llm = Llama(model_path=model_path, n_gpu_layers=ngl, n_batch=n_batch, n_threads=n_threads, n_threads_batch=n_threads_batch, n_ctx=1100, verbose=True)
+    prompt = np.random.randint(1, llm._model.n_vocab(), size=prompt_length).tolist()
 
     load_times = []
     sample_times = []
@@ -104,7 +109,7 @@ def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batc
 
     for i in range(k_folds):
         output = llm(
-            prompt, 
+            prompt,
             max_tokens=new_tokens,
             logit_bias={llm._token_eos: float('-inf')},
             temperature=0.3,
@@ -123,10 +128,13 @@ def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batc
     run_time = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
     log = {
         "id": output["id"],
-        'run_name': RUN_NAME,
-        'run_time': run_time,
-        **get_llm_config(llm, ngl), 
-        **output["usage"],
+        "memo": memo,
+        "Run Name": RUN_NAME,
+        "run_time": run_time,
+        **get_llm_config(llm),
+        "GPU Layers": p_ngl,
+        "Prompt Length": prompt_length+1,
+        "New Tokens": new_tokens,
         "Load Time (s)": sum(load_times) / len(load_times),
         "Sample Time (s)": sum(sample_times) / len(sample_times),
         "Prompt Eval Time (s)": sum(prompt_eval_times) / len(prompt_eval_times),
@@ -148,33 +156,32 @@ def main():
     os.makedirs('input', exist_ok=True)
 
     # create the node id
-    device = 'cpu only' if not torch.cuda.is_available() else torch.cuda.get_device_properties('cuda').name
-    vram = '0' if not torch.cuda.is_available() else str(round(torch.cuda.get_device_properties('cuda').total_memory / 1024 / 1024 / 1024, 2))
-    ram = str(round(psutil.virtual_memory().total / 1024 / 1024 / 1024, 2))
-    n_cpu = str(len(psutil.Process().cpu_affinity()))
-    model_name = os.path.basename(os.path.normpath(args.model_path))
-    node_id = '-'.join([device, vram, ram, n_cpu, model_name])
+    # device = 'cpu only' if not torch.cuda.is_available() else torch.cuda.get_device_properties('cuda').name
+    # vram = '0' if not torch.cuda.is_available() else str(round(torch.cuda.get_device_properties('cuda').total_memory / 1024 / 1024 / 1024, 2))
+    # ram = str(round(psutil.virtual_memory().total / 1024 / 1024 / 1024, 2))
+    # n_cpu = str(len(psutil.Process().cpu_affinity()))
+    # model_name = os.path.basename(os.path.normpath(args.model_path))
+    # node_id = '-'.join([device, vram, ram, n_cpu, model_name])
 
     # safe condition in case GPU is not avalable
     if not torch.cuda.is_available():
         raise EnvironmentError('cuda not avalable')
-
-    for params in itertools.product(args.n_threads, args.n_threads_batch, args.n_batch, args.ngl):
-        n_threads, n_threads_batch, n_batch, ngl = params
-        int_ngl = int(MAX_MODEL_LAYERS*ngl) # convert to the number of layers to offload
+    print()
+    for params in itertools.product(args.n_threads, args.n_threads_batch, args.n_batch, args.ngl, args.prompt_length, args.new_tokens):
+        n_threads, n_threads_batch, n_batch, ngl, prompt_length, new_tokens = params
+        model_path = os.path.join(MODELS_DIR, args.model_path)
+        int_ngl = int((int(Llama(model_path=model_path, verbose=False).metadata['llama.block_count'])+1)*ngl) # convert to the number of layers to offload
 
         # check if the configuration has already been tested on the current machine
         config_already_tried = not df[(df['Threads'] == n_threads) & 
                                   (df['Batch Threads'] == n_threads_batch) & 
                                   (df['Batch'] == n_batch) & 
-                                  (df['GPU Layers'] == ngl) &
-                                  (df['Node ID'] == node_id)].empty
+                                  (df['GPU Layers'] == ngl)].empty
 
         if config_already_tried and not args.force:
-            print(f'Configuration already tested on this machine\n\tn_threads: {n_threads}\n\tn_threads_batch: {n_threads_batch}\n\tn_batch: {n_batch}\n\tngl: {ngl} ({int_ngl})\n')
+            print(f'Configuration already tested on this machine\n\tn_threads: {n_threads}\n\tn_threads_batch: {n_threads_batch}\n\tn_batch: {n_batch}\n\tngl: {ngl} ({ngl})\n')
         else:
-            print(n_threads, n_threads_batch, n_batch, int_ngl)
-            benchmark_gguf(args.prompt_length-1, args.model_path, n_threads, n_threads_batch, n_batch, ngl, args.new_tokens, args.k_folds)
+            benchmark_gguf(prompt_length-1, model_path, n_threads, n_threads_batch, n_batch, int_ngl, new_tokens, args.k_folds, ngl, args.memo)
 
 
 if __name__ == "__main__":

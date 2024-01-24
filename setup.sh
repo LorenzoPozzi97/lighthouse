@@ -12,9 +12,10 @@ pip install psutil==5.9.7
 pip install torch==2.1.2
 pip install torchvision==0.16.2
 pip install torchaudio==2.1.2
+pip install -U kaleido==0.2.1
 
 # GGUF pkgs
-CMAKE_ARGS="-DLLAMA_CUBLAS=on" pip install llama-cpp-python==0.2.26 --no-cache-dir
+CMAKE_ARGS="-DLLAMA_CUBLAS=on" pip install llama-cpp-python==0.2.32 --no-cache-dir
 
 # GPTQ pkgs
 pip install accelerate==0.26.1
