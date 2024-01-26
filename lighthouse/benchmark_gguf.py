@@ -1,5 +1,6 @@
 # TODO
 # fix kfold
+# offload based on the memory I want free
 
 import os
 import sys
@@ -15,6 +16,8 @@ import numpy as np
 import pandas as pd
 
 #from tqdm import tqdm
+from typing import Dict
+from pathlib import Path
 from datetime import datetime
 from nltk.corpus import wordnet
 from llama_cpp import Llama, llama_get_timings
@@ -93,12 +96,19 @@ def get_timings(llm):
         "Eval Time (Tk/s)": (timings.n_eval * 1000) / timings.t_eval_ms
     }
 
-def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batch, ngl, new_tokens, k_folds, p_ngl, memo, ctx):
+def benchmark_gguf(prompt_length: int,
+                   model_path: Path,
+                   n_threads: int,
+                   n_threads_batch: int,
+                   n_batch: int,
+                   ngl: int,
+                   new_tokens: int,
+                   k_folds: int,
+                   ctx: int) -> Dict:
     print(os.path.basename(os.path.normpath(model_path)), n_threads, n_threads_batch, n_batch, ngl, prompt_length)
 
     llm = Llama(model_path=model_path, n_gpu_layers=ngl, n_batch=n_batch, n_threads=n_threads, n_threads_batch=n_threads_batch, n_ctx=ctx, verbose=True)
     prompt = np.random.randint(1, llm._model.n_vocab(), size=prompt_length).tolist()
-    print(len(prompt))
 
     load_times = []
     sample_times = []
@@ -128,13 +138,12 @@ def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batc
         eval_tks.append(timings["Eval Time (Tk/s)"])
 
     run_time = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
-    log = {
+    return {
         "id": output["id"],
-        "memo": memo,
         "Run Name": RUN_NAME,
         "run_time": run_time,
         **get_llm_config(llm),
-        "GPU Layers": p_ngl,
+        
         "Context Window": ctx,
         "Prompt Length": prompt_length+1,
         "New Tokens": new_tokens,
@@ -147,9 +156,6 @@ def benchmark_gguf(prompt_length, model_path, n_threads, n_threads_batch, n_batc
         "Prompt Eval Time (Tk/s)": round(sum(prompt_eval_tks) / len(prompt_eval_tks), 2),
         "Eval Time (Tk/s)": round(sum(eval_tks) / len(eval_tks), 2)
     }
-
-    with open(os.path.join('input', f'{run_time}.json'), 'w') as fp:
-        json.dump(log, fp)
 
 def main():
     """Main execution function."""
@@ -176,7 +182,11 @@ def main():
         if config_already_tried and not args.force:
             print(f'Configuration already tested on this machine\n\tn_threads: {n_threads}\n\tn_threads_batch: {n_threads_batch}\n\tn_batch: {n_batch}\n\tngl: {ngl} ({ngl})\n')
         else:
-            benchmark_gguf(prompt_length-1, model_path, n_threads, n_threads_batch, n_batch, int_ngl, new_tokens, args.k_folds, ngl, args.memo, args.ctx)
+            log = benchmark_gguf(prompt_length-1, model_path, n_threads, n_threads_batch, n_batch, int_ngl, new_tokens, args.k_folds, args.ctx)
+            log["memo"] = args.memo
+            log["GPU Layers"] = ngl
+            with open(os.path.join('input', f'{datetime.now().strftime("%d-%m-%Y_%H:%M:%S")}.json'), 'w') as fp:
+                json.dump(log, fp)
 
 
 if __name__ == "__main__":
