@@ -48,7 +48,7 @@ def process_json_files_in_folder(folder_path="input", existing_df_file='bulb.csv
 # new labels?
 if __name__=='__main__':
     final_df = process_json_files_in_folder()
-    final_df['Node ID'] = final_df.apply(create_unique_id, axis=1)
+    #final_df['Node ID'] = final_df.apply(create_unique_id, axis=1)
     final_df.to_csv('output/bulb.csv', index=False)
     print(final_df)
 
