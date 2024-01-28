@@ -1,6 +1,6 @@
 # TODO
-# fix kfold
 # offload based on the memory I want free
+# track memory peak/usage
 
 import os
 import sys
@@ -15,12 +15,12 @@ import itertools
 import numpy as np
 import pandas as pd
 
-#from tqdm import tqdm
+from tqdm import tqdm
 from typing import Dict
 from pathlib import Path
 from datetime import datetime
 from nltk.corpus import wordnet
-from llama_cpp import Llama, llama_get_timings
+from llama_cpp import Llama, llama_get_timings, llama_free
 
 np.random.seed(101)
 sys.dont_write_bytecode = True
@@ -58,6 +58,7 @@ def parse_arguments():
     parser.add_argument("--ctx", type=int, default=1100, help="Context window.")
     parser.add_argument("--k_folds", type=int, default=1, help="Number of repeated tests.")
     parser.add_argument("--memo", type=str, default='', help="Description of the experiment.")
+    parser.add_argument("--debug", action='store_true', default=False, help="Description of the experiment.")
     return parser.parse_args()
 
 def get_llm_config(llm):
@@ -119,7 +120,7 @@ def benchmark_gguf(prompt_length: int,
     prompt_eval_tks = []
     eval_tks = []
 
-    for i in range(k_folds):
+    for _ in tqdm(range(k_folds)):        
         output = llm(
             prompt,
             max_tokens=new_tokens,
@@ -137,6 +138,9 @@ def benchmark_gguf(prompt_length: int,
         prompt_eval_tks.append(timings["Prompt Eval Time (Tk/s)"])
         eval_tks.append(timings["Eval Time (Tk/s)"])
 
+        # Manually reset the model state to repeat the operation
+        llm.reset()
+        
     run_time = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
     return {
         "id": output["id"],
@@ -156,6 +160,42 @@ def benchmark_gguf(prompt_length: int,
         "Prompt Eval Time (Tk/s)": round(sum(prompt_eval_tks) / len(prompt_eval_tks), 2),
         "Eval Time (Tk/s)": round(sum(eval_tks) / len(eval_tks), 2)
     }
+
+def create_unique_id(row):
+    # NOTE 
+    # This function assumes that if there is an avalable GPU it is an NVIDIA
+    return '-'.join(map(str, row[['Device', 'VRAM (GB)', 'RAM (GB)', 'CPU Count', 'Model']]))
+
+def load_existing_dataframe(existing_df_path):
+    """Load an existing DataFrame from a CSV file."""
+    if os.path.exists(existing_df_path):
+        return pd.read_csv(existing_df_path)
+    else:
+        return pd.DataFrame()
+
+def read_json_file(file_path):
+    """Read a JSON file and convert it to a DataFrame."""
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+    data = {key: [value] if not isinstance(value, list) else value for key, value in data.items()}
+    return pd.DataFrame.from_dict(data)
+
+def append_to_dataframe(main_df, new_df):
+    """Append a new DataFrame to an existing DataFrame."""
+    return pd.concat([main_df, new_df], ignore_index=True)
+
+def process_json_files_in_folder(folder_path="input", existing_df_file='bulb.csv'):
+    """Process all JSON files in a folder, appending to an existing DataFrame or creating a new one."""
+    existing_df_path = os.path.join("output", existing_df_file)
+    final_df = load_existing_dataframe(existing_df_path)
+
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.json'):
+            file_path = os.path.join(folder_path, filename)
+            new_df = read_json_file(file_path)
+            final_df = append_to_dataframe(final_df, new_df)
+
+    return final_df.drop_duplicates(subset=["id"])
 
 def main():
     """Main execution function."""
@@ -185,8 +225,13 @@ def main():
             log = benchmark_gguf(prompt_length-1, model_path, n_threads, n_threads_batch, n_batch, int_ngl, new_tokens, args.k_folds, args.ctx)
             log["memo"] = args.memo
             log["GPU Layers"] = ngl
-            with open(os.path.join('input', f'{datetime.now().strftime("%d-%m-%Y_%H:%M:%S")}.json'), 'w') as fp:
-                json.dump(log, fp)
+            if not args.debug:
+                with open(os.path.join('input', f'{datetime.now().strftime("%d-%m-%Y_%H:%M:%S")}.json'), 'w') as fp:
+                    json.dump(log, fp)
+    if not args.debug:
+        final_df = process_json_files_in_folder()
+        #final_df['Node ID'] = final_df.apply(create_unique_id, axis=1)
+        final_df.to_csv('output/bulb.csv', index=False)
 
 
 if __name__ == "__main__":
