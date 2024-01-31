@@ -1,3 +1,3 @@
 # lighthouse
 
-Library for testing inference performance of LLMs
+Library for testing inference performance of LLMs with GGUF format

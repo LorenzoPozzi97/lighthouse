@@ -1,3 +1,5 @@
+# Inspired from https://github.com/huggingface/optimum/blob/main/tests/benchmark/benchmark_gptq.py
+
 import argparse
 import gc
 import os

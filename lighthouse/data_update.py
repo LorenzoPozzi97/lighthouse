@@ -1,8 +1,3 @@
-# load all .out from a folder
-# TODO
-# Add optin to add or deletae runs
-# create or update an existing dataframe
-
 import pandas as pd
 import os
 import json
@@ -43,9 +38,6 @@ def process_json_files_in_folder(folder_path="input", existing_df_file='bulb.csv
 
     return final_df.drop_duplicates(subset=["id"])
 
-# TODO
-# backups
-# new labels?
 if __name__=='__main__':
     final_df = process_json_files_in_folder()
     #final_df['Node ID'] = final_df.apply(create_unique_id, axis=1)
