@@ -110,7 +110,7 @@ def benchmark_gguf(model: Llama,
     
     def average_timings(lst):
         return round(sum(lst) / len(lst), 2)
-    
+
     averaged_timings = {key: average_timings(value) for key, value in timings.items()}
     run_time = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
 
@@ -119,42 +119,6 @@ def benchmark_gguf(model: Llama,
         "run_time": run_time,
         **averaged_timings
     }
-
-# def create_unique_id(row):
-#     # NOTE 
-#     # This function assumes that if there is an avalable GPU it is an NVIDIA
-#     return '-'.join(map(str, row[['Device', 'VRAM (GB)', 'RAM (GB)', 'CPU Count', 'Model']]))
-
-# def load_existing_dataframe(existing_df_path):
-#     """Load an existing DataFrame from a CSV file."""
-#     if os.path.exists(existing_df_path):
-#         return pd.read_csv(existing_df_path)
-#     else:
-#         return pd.DataFrame()
-
-# def read_json_file(file_path):
-#     """Read a JSON file and convert it to a DataFrame."""
-#     with open(file_path, 'r') as file:
-#         data = json.load(file)
-#     data = {key: [value] if not isinstance(value, list) else value for key, value in data.items()}
-#     return pd.DataFrame.from_dict(data)
-
-# def append_to_dataframe(main_df, new_df):
-#     """Append a new DataFrame to an existing DataFrame."""
-#     return pd.concat([main_df, new_df], ignore_index=True)
-
-# def process_json_files_in_folder(folder_path="input", existing_df_file='bulb.csv'):
-#     """Process all JSON files in a folder, appending to an existing DataFrame or creating a new one."""
-#     existing_df_path = os.path.join("output", existing_df_file)
-#     final_df = load_existing_dataframe(existing_df_path)
-
-#     for filename in os.listdir(folder_path):
-#         if filename.endswith('.json'):
-#             file_path = os.path.join(folder_path, filename)
-#             new_df = read_json_file(file_path)
-#             final_df = append_to_dataframe(final_df, new_df)
-
-#     return final_df.drop_duplicates(subset=["id"])
 
 def check_experiment(bulb, args, model_path):
     run_names = []
@@ -186,8 +150,6 @@ def main():
     """Main execution function."""
     args = parse_arguments()
 
-    # create the folder that will host the output (if doesn't exists already)
-    # os.makedirs('input', exist_ok=True)
     bulb = pd.Dataframe() if not os.path.exists('output/bulb.csv') else pd.read_csv('output/bulb.csv')
     model_path = os.path.join(MODELS_DIR, args.model_path)
 
@@ -232,15 +194,12 @@ def main():
             }
         
         log.update(benchmark_gguf(model, prompt_length - 1, new_tokens, args.k_folds))
-        print(log)
+
         if not args.debug:
             print(pd.DataFrame([log]))
             bulb = pd.concat([bulb, pd.DataFrame([log])], ignore_index=True)
-            # with open(os.path.join('input', f'{datetime.now().strftime("%d-%m-%Y_%H:%M:%S")}.json'), 'w') as fp:
-                # json.dump(log, fp)
+
     if not args.debug:
-        # final_df = process_json_files_in_folder()
-        #final_df['Node ID'] = final_df.apply(create_unique_id, axis=1)
         bulb.to_csv('output/bulb.csv', index=False)
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ def parse_arguments():
     parser.add_argument('--store', action='store_true', default=False, help="Store graph in images folder.")
 
     return parser.parse_args()
+
 def main():
 
     args = parse_arguments()
@@ -62,12 +63,12 @@ def main():
         )
     )
 
-
     fig.update_layout(
         margin=dict(l=380, r=150, t=250, b=50),
         width=2000,
         height=1000,
     )
+
     fig.show()
 
     if args.store:
