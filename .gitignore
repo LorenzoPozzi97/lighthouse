@@ -1,5 +1,5 @@
 .lighthouse/
-check_llm_layers.ipynb
+bulb.csv
 __pycache__/
 images/
 lighthouse/benchmark_gptq.py
