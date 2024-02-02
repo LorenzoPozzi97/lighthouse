@@ -25,7 +25,7 @@ from llama_cpp import Llama, llama_get_timings, llama_free
 np.random.seed(101)
 
 MODELS_DIR = os.path.join(os.path.expanduser("~"), 'models')
-df = pd.read_csv('output/bulb.csv')
+df = pd.read_csv('bulb.csv')
 
 def get_wordnet_word(pos):
     """ Get a list of words for a specific part of speech from WordNet. """
@@ -150,7 +150,7 @@ def main():
     """Main execution function."""
     args = parse_arguments()
 
-    bulb = pd.Dataframe() if not os.path.exists('output/bulb.csv') else pd.read_csv('output/bulb.csv')
+    bulb = pd.Dataframe() if not os.path.exists('bulb.csv') else pd.read_csv('bulb.csv')
     model_path = os.path.join(MODELS_DIR, args.model_path)
 
     # safe condition in case GPU is not avalable
@@ -200,7 +200,7 @@ def main():
             bulb = pd.concat([bulb, pd.DataFrame([log])], ignore_index=True)
 
     if not args.debug:
-        bulb.to_csv('output/bulb.csv', index=False)
+        bulb.to_csv('bulb.csv', index=False)
 
 if __name__ == "__main__":
     print('Thinking...')
