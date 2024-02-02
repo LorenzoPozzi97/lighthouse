@@ -2,7 +2,7 @@
 <img src="https://github.com/LorenzoPozzi97/lighthouse/assets/83987444/283cb75c-c033-4b9d-8dcd-668b4054ad18" width="400" height="400">
 
 ## Benchmarking inference of quantized LLM models
-The lighthouse intention is sheding light on LLMs inference performance. Navigating the seas of models can be strenuous, that is why lighthouse provides functionalities to quickly understand the potention of your model.
+Performance of a model can remarkably vary depending many factors: hardware, model architecture, kernel, etc. The lighthouse intention is sheding light on LLMs inference performance. Navigating the seas of models can be strenuous, that is why lighthouse provides functionalities to quickly understand the potention of your model across different configurations.
 
 ## Setup
 To use the fuctionalities of the lighthouse on your machine just clone the repo with:
