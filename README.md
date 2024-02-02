@@ -14,7 +14,11 @@ Call the script setup.sh that will create a virtual environemnt with all the nec
 bash setup.sh
 source .lighthouse/bin/activate
 ```
-
+### Supported platforms
+- [x] Linux
+- [ ] Windows
+- [ ] Mac OS
+      
 ## What you can do
 - [x] benchmark GGUF
 - [ ] bechmark GPTQ
