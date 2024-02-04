@@ -20,13 +20,20 @@ source .lighthouse/bin/activate
 - [ ] Mac OS
       
 ## What you can do
-- [x] benchmark GGUF
-- [ ] bechmark GPTQ
-- [ ] benchmark AWQ
+Here is a list of the metrics that is currenty possible to track with the lighthouse:
+- Model load time
+- Prompt processing time
+- Token generation time
+
+### Supported quantization formats
+- [x] GGUF
+- [ ] GPTQ
+- [ ] AWQ
 
 ## Usage
-The lighthouse works in two steps:
-- create a bulb 💡 which is were you store the result of your tests
+The lighthouse works in three steps:
+- decide the parameters of your experiments
+- store the results in your personal database, namely the bulb 💡
 - interrogate the bulb 💡 to create interactive graphs
 
 Here is a typical interaction with the library to test a modle quantized in gguf format:
