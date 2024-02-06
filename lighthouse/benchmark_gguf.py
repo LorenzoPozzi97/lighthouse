@@ -18,7 +18,7 @@ import pandas as pd
 from tqdm import tqdm
 from datetime import datetime
 from typing import Dict
-from memory_tracker import MemoryTracker
+#from memory_tracker import MemoryTracker
 from llama_cpp import Llama, llama_get_timings, llama_free
 
 np.random.seed(101)
@@ -37,6 +37,7 @@ df = pd.read_csv('bulb.csv')
 #     return f"{adjective}_{noun}".replace('-', '_').replace('\'', '_')
 
 RUN_NAME = random_noun_adjective()
+print(RUN_NAME)
 
 def parse_arguments():
     """Parse command line arguments."""
@@ -96,8 +97,7 @@ def get_timings(llm: Llama) -> Dict[str, float]:
 def benchmark_gguf(model: Llama,
                    prompt_length: int,
                    new_tokens: int,
-                   replica: int,
-                   memory_tracker: MemoryTracker) -> Dict[str, int | str]:
+                   replica: int) -> Dict[str, int | str]:
     
     prompt = np.random.randint(1, model._model.n_vocab(), size=prompt_length).tolist()
 
@@ -149,7 +149,7 @@ def main():
 
     bulb = pd.Dataframe() if not os.path.exists('bulb.csv') else pd.read_csv('bulb.csv')
     model_path = os.path.join(MODELS_DIR, args.model)
-    memory_tracker = MemoryTracker()
+    #memory_tracker = MemoryTracker()
 
     if not torch.cuda.is_available():
         args.ngl = [0]
@@ -196,8 +196,7 @@ def main():
             benchmark_gguf(model,
                            prompt_length - 1,
                            new_tokens,
-                           args.replica,
-                           memory_tracker))
+                           args.replica))
 
         if not args.debug:
             bulb = pd.concat([bulb, pd.DataFrame([experiment])], ignore_index=True)

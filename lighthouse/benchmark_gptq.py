@@ -244,6 +244,7 @@ if __name__ == '__main__':
     args = parse_arguments()
 
     RUN_NAME = random_noun_adjective()
+    print(RUN_NAME)
 
     bulb = pd.Dataframe() if not os.path.exists('bulb.csv') else pd.read_csv('bulb.csv')
 
@@ -450,7 +451,7 @@ if __name__ == '__main__':
                 "RAM (GB)": round(psutil.virtual_memory().total / 1024 / 1024 / 1024, 2),
                 "CPU Count": len(psutil.Process().cpu_affinity()),
                 "Model": os.path.basename(model_path)+'-'+args.revision,
-                "Model Size (GB)": round(os.path.getsize(model_path) / 1024 / 1024 / 1024, 2),
+                #"Model Size (GB)": round(os.path.getsize(model_path) / 1024 / 1024 / 1024, 2),
                 "Batch": batch_size,
                 "Prompt Length": prompt_length,
                 "New Tokens": new_tokens,
