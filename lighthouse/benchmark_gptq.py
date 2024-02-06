@@ -118,7 +118,7 @@ def get_timings(
         end_event.record()
         torch.cuda.synchronize()
 
-        latency_s = start_event.elapsed_time(end_event) * 1000
+        latency_s = start_event.elapsed_time(end_event) / 1000
         print(f"\nLatency (Tk/s): {latency_s / generation_config.min_new_tokens:.3f} s")
         latencies.append(latency_s)
 
