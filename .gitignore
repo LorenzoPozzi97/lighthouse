@@ -2,7 +2,6 @@
 bulb.csv
 __pycache__/
 images/
-lighthouse/benchmark_gptq.py
-lighthouse/check_llm_layers.ipynb
 lighthouse/cog_tests.py
 lighthouse/memory_tracker.py
+lighthouse/benchmark_awq.py

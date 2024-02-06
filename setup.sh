@@ -1,5 +1,5 @@
 # Create a virtual environment
-python3 -m venv .lighthouse
+python3.10 -m venv .lighthouse
 
 # Activate the virtual environment
 source .lighthouse/bin/activate
