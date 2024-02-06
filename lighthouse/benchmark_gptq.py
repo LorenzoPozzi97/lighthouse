@@ -415,7 +415,7 @@ if __name__ == '__main__':
 
             index = (batch_size, prompt_length, new_tokens)
 
-            per_token_latency = mean_latency / (new_tokens * 1000)
+            per_token_latency = mean_latency / (new_tokens)
             latencies[index] = per_token_latency
 
             throughput = batch_size / (per_token_latency * 1e-3)
