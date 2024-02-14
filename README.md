@@ -81,9 +81,9 @@ Experments can track a number of different metrics.
 
 ### Supported quantization formats
 - [x] GGUF
-- [ ] GPTQ
+- [x] GPTQ
 - [ ] EETQ
-- [ ] bitsandbytes
+- [x] bitsandbytes
 - [ ] AWQ
 
 
