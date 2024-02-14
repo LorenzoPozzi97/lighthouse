@@ -18,13 +18,14 @@ def main():
 
     args = parse_arguments()
 
-    df = pd.read_csv('output/bulb.csv')
+    df = pd.read_csv('bulb.csv')
 
     # Create a mapping from model names to numbers
     map_fn = {model: i for i, model in enumerate(df['Model'].unique())}
-    columns = ['Model', 'Run Name', 'Device', 'CPU Count', 'RAM (GB)', 'VRAM (GB)', 'Model Size (GB)', 'GPU Layers', 
-            'Batch', 'Threads', 'Batch Threads', 'Prompt Length', 'New Tokens', 'Sample Time (Tk/s)', 'Prompt Eval Time (Tk/s)', 
-            'Eval Time (Tk/s)']
+    columns = ['Model', 'Quant. Method', 'Device', 'Model Size (GB)',
+               'Mem. Usage (GB)', 'Prompt Length', 'New Tokens','GPU Layers', 
+               'Batch Size', 'Num. Requests', 'Prefill Threads', 'Kernel',
+               'Decode Threads', 'Prefill Time (tk/s)', 'Decode Time (tk/s)']
 
     df = df[columns]
 

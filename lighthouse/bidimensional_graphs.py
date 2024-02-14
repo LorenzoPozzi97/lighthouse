@@ -11,7 +11,7 @@ def parse_arguments():
         prog='2D-plots',
         description='Generate 2D interactive graphs of LLM inference performance.',
     )
-    parser.add_argument('-x', '--xaxes', action='store', default='GPU Layers', choices=['GPU Layers', 'Threads', 'Batch Threads', 'Prompt Length'], type=str, help="X axes parameter.")
+    parser.add_argument('-x', '--xaxes', action='store', default='GPU Layers', choices=['GPU Layers', 'Decode Threads', 'Prefill Threads', 'Prompt Length', 'Num. Requests'], type=str, help="X axes parameter.")
     parser.add_argument('--run-anchor', action='store', nargs='+', type=str, required=True, help="Anchor value for run name.")
     parser.add_argument('--store', action='store_true', default=False, help="Store graphs in images folder.")
 
@@ -21,7 +21,7 @@ def main():
 
     args = parse_arguments()
 
-    df = pd.read_csv('output/bulb.csv').drop(['id'], axis=1)
+    df = pd.read_csv('bulb.csv').drop(['id'], axis=1)
 
      # Create a subplot figure with 1 row and 2 columns
     fig = make_subplots(rows=3, cols=1,
@@ -34,7 +34,7 @@ def main():
         fig.add_trace(
             go.Scatter(
                 x=filtered_df[args.xaxes],
-                y=filtered_df["Prompt Eval Time (Tk/s)"],
+                y=filtered_df["Prefill Time (tk/s)"],
                 hovertemplate='%{y:.2f}',
                 mode='markers',
                 name=f'{run_anchor}'),
@@ -43,7 +43,7 @@ def main():
         fig.add_trace(
             go.Scatter(
                 x=filtered_df[args.xaxes],
-                y=filtered_df["Eval Time (Tk/s)"],
+                y=filtered_df["Decode Time (tk/s)"],
                 hovertemplate='%{y:.2f}',
                 mode='markers',
                 name=f'{run_anchor}'),
@@ -53,15 +53,15 @@ def main():
             go.Scatter(
                 x=filtered_df[args.xaxes],
                 y=filtered_df["Total Time (s)"],
-                customdata=filtered_df[["Load Time (s)", "Sample Time (s)", "Prompt Eval Time (s)", "Eval Time (s)"]].to_numpy(),
-                hovertemplate='<b>Total Time: %{y:.2f}</b> <br>Load Time: %{customdata[0]:.1f} <br>Sample Time: %{customdata[1]:.2f} <br>Prompt Eval Time: %{customdata[2]:.1f} <br>Eval Time: %{customdata[3]:.1f}',
+                customdata=filtered_df[["Load Time (s)", "Prefill Time (s)", "Decode Time (s)"]].to_numpy(),
+                hovertemplate='<b>Total Time: %{y:.2f}</b> <br>Load Time: %{customdata[0]:.1f} <br>Prefill Time: %{customdata[2]:.1f} <br>Decode Time: %{customdata[3]:.1f}',
                 mode='markers',
                 name=f'{run_anchor}'),
             row=3, col=1
         )
 
-    fig.update_yaxes(title_text="Prompt Eval Time (Tk/s)", row=1, col=1)
-    fig.update_yaxes(title_text="Eval Time (Tk/s)", row=2, col=1)
+    fig.update_yaxes(title_text="Prefill Time (tk/s)", row=1, col=1)
+    fig.update_yaxes(title_text="Decode Time (tk/s)", row=2, col=1)
     fig.update_yaxes(title_text="Latency (s)", row=3, col=1)
     fig.update_xaxes(title_text=args.xaxes, row=3, col=1)
 

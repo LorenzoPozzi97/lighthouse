@@ -18,23 +18,13 @@ import pandas as pd
 from tqdm import tqdm
 from datetime import datetime
 from typing import Dict
-#from memory_tracker import MemoryTracker
+from memory_tracker import MemoryTracker
 from llama_cpp import Llama, llama_get_timings, llama_free
 
 np.random.seed(101)
 
 MODELS_DIR = os.path.join(os.path.expanduser("~"), 'models')
-df = pd.read_csv('bulb.csv')
-
-# def get_wordnet_word(pos):
-#     """ Get a list of words for a specific part of speech from WordNet. """
-#     synset = random.choice(list(wordnet.all_synsets(pos)))
-#     return random.choice(synset.lemmas()).name()
-
-# def random_noun_adjective():
-#     noun = get_wordnet_word(wordnet.NOUN)
-#     adjective = get_wordnet_word(wordnet.ADJ)
-#     return f"{adjective}_{noun}".replace('-', '_').replace('\'', '_')
+#df = pd.read_csv('bulb.csv')
 
 RUN_NAME = random_noun_adjective()
 print(RUN_NAME)
@@ -51,9 +41,9 @@ def parse_arguments():
     parser.add_argument('--n-batch', action='store',  nargs='+', type=int, default=[512], help="Prompt processing maximum batch size.")
     parser.add_argument('--ngl', action='store', nargs='+', type=float, default=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1], help="Percentage of layers to store in VRAM.")
     parser.add_argument('--force', action='store_true', default=False, help="False the test even if the config already exists.")
-    parser.add_argument("--prompt-length", nargs='+', type=int, default=[100], help="Length of the prompt (ratio fro te context window menus new_tokens).")
+    parser.add_argument("--prompt-length", nargs='+', type=int, default=[100], help="Length of the prompt.")
     parser.add_argument("--new-tokens", nargs='+', type=int, default=[100], help="Length of the generation.")
-    parser.add_argument("--ctx", type=int, default=1100, help="Context window.")
+    parser.add_argument("--ctx", type=int, default=1100, help="Context length.")
     parser.add_argument("--replica", type=int, default=1, help="Number of repeated experiments.")
     parser.add_argument("--memo", type=str, default='', help="Description of the experiment.")
     parser.add_argument("--debug", action='store_true', default=False, help="Reslts won't be stored.")
@@ -84,45 +74,60 @@ def get_timings(llm: Llama) -> Dict[str, float]:
 
     return {
         "Load Time (s)": timings.t_load_ms / 1000,
-        "Sample Time (s)": timings.t_sample_ms / 1000,
-        "Prompt Eval Time (s)": timings.t_p_eval_ms / 1000,
-        "Eval Time (s)": timings.t_eval_ms / 1000,
+        #"Sample Time (s)": timings.t_sample_ms / 1000,
+        "Prefill Time (s)": timings.t_p_eval_ms / 1000,
+        "Decode Time (s)": timings.t_eval_ms / 1000,
         "Latency (s)": (timings.t_end_ms - timings.t_start_ms) / 1000,
-        "Sample Time (Tk/s)": (timings.n_sample * 1000) / timings.t_sample_ms,
-        "Prompt Eval Time (Tk/s)": (timings.n_p_eval * 1000) / timings.t_p_eval_ms,
-        "Eval Time (Tk/s)": (timings.n_eval * 1000) / timings.t_eval_ms,
-        "Latency (Tk/s)": ((timings.n_p_eval + timings.n_eval) * 1000) / (timings.t_end_ms - timings.t_start_ms)
+        #"Sample Time (Tk/s)": (timings.n_sample * 1000) / timings.t_sample_ms,
+        "Prefill Time (tk/s)": (timings.n_p_eval * 1000) / timings.t_p_eval_ms,
+        "Decode Time (tk/s)": (timings.n_eval * 1000) / timings.t_eval_ms,
+        "Latency (tk/s)": ((timings.n_p_eval + timings.n_eval) * 1000) / (timings.t_end_ms - timings.t_start_ms)
     }
 
 def benchmark_gguf(model: Llama,
                    prompt_length: int,
                    new_tokens: int,
-                   replica: int) -> Dict[str, int | str]:
+                   replica: int,
+                   memory_tracker: MemoryTracker) -> Dict[str, int | str]:
+
+    torch.cuda.empty_cache()
+    gc.collect()
     
     prompt = np.random.randint(1, model._model.n_vocab(), size=prompt_length).tolist()
 
     timings = {
         "Load Time (s)": [],
-        "Sample Time (s)": [],
-        "Prompt Eval Time (s)": [],
-        "Eval Time (s)": [],
+        #"Sample Time (s)": [],
+        "Prefill Time (s)": [],
+        "Decode Time (s)": [],
         "Latency (s)": [],
-        "Sample Time (Tk/s)": [],
-        "Prompt Eval Time (Tk/s)": [],
-        "Eval Time (Tk/s)": [],
-        "Latency (Tk/s)": []
+        #"Sample Time (Tk/s)": [],
+        "Prefill Time (tk/s)": [],
+        "Decode Time (tk/s)": [],
+        "Latency (tk/s)": []
     }
 
-    torch.cuda.empty_cache()
-    gc.collect()
-    for _ in range(replica):     
-        output = model(
-            prompt,
-            max_tokens=new_tokens,
-            logit_bias={model._token_eos: float('-inf')},
-            temperature=0.3,
-            seed=101
-            )
+    
+    for r in range(replica):
+        if r == 0:
+            with memory_tracker.track():
+                output = model(
+                    prompt,
+                    max_tokens=new_tokens,
+                    logit_bias={model._token_eos: float('-inf')},
+                    temperature=0.3,
+                    seed=101
+                    )
+                torch.cuda.synchronize()
+                memory_stats = torch.cuda.memory_stats()
+        else:
+            output = model(
+                prompt,
+                max_tokens=new_tokens,
+                logit_bias={model._token_eos: float('-inf')},
+                temperature=0.3,
+                seed=101
+                )
         model_timings = get_timings(model)
 
         for key in timings:
@@ -130,6 +135,16 @@ def benchmark_gguf(model: Llama,
 
         # Manually reset the model state to repeat the operation
         model.reset()
+
+    #     torch.cuda.synchronize()
+
+    # memory_stats = torch.cuda.memory_stats()
+
+    peak_allocated_torch_mb = memory_stats["allocated_bytes.all.peak"] * 1e-6
+    peak_reserved_torch_mb = memory_stats["reserved_bytes.all.peak"] * 1e-6
+    peak_nvml_mb = memory_tracker.peak_memory
+    peak_external_mb = peak_nvml_mb - peak_reserved_torch_mb
+    peak_memory_mb = peak_allocated_torch_mb + peak_external_mb
 
     def average_timings(lst):
         return round(sum(lst) / len(lst), 2)
@@ -140,21 +155,44 @@ def benchmark_gguf(model: Llama,
     return {
         "id": output["id"],
         "run_time": run_time,
-        **averaged_timings
+        **averaged_timings,
+        "Mem. Usage (GB)": f'{peak_memory_mb / 1000:.2f}'
     }
 
 def main():
-    """Main execution function."""
     args = parse_arguments()
+    columns = ['Device',
+               'CPU Count',
+               'Model',
+               'Prompt Length',
+               'New Tokens',
+               'llama_cpp_v',
+               'Context Length',
+               'Decode Threads',
+               'Prefill Threads',
+               'GPU Layers',
+               'auto_gptq_v',
+               'Num. Requests',
+               'Kernel']
 
-    bulb = pd.Dataframe() if not os.path.exists('bulb.csv') else pd.read_csv('bulb.csv')
+    bulb = initialize_bulb(columns) if not os.path.exists('bulb.csv') else pd.read_csv('bulb.csv')
     model_path = os.path.join(MODELS_DIR, args.model)
-    #memory_tracker = MemoryTracker()
+    memory_tracker = MemoryTracker()
 
     if not torch.cuda.is_available():
         args.ngl = [0]
 
-    if check_experiment(bulb, args, model_path):
+    param_combinations = {
+        "Decode Threads": args.n_threads,
+        "Prefill Threads": args.n_threads_batch,
+        "Batch Size": args.n_batch,
+        "GPU Layers": args.ngl,
+        "Prompt Length": args.prompt_length, 
+        "New Tokens": args.new_tokens,
+        "Context Length": [args.ctx]
+    }
+
+    if check_experiment(bulb, param_combinations, model_path):
         return None
 
     param_combinations = list(itertools.product(
@@ -172,31 +210,36 @@ def main():
 
         model = Llama(model_path=model_path, n_gpu_layers=int_ngl, n_batch=n_batch, n_threads=n_threads, n_threads_batch=n_threads_batch, n_ctx=args.ctx, verbose=False)
 
+        diagnostics = benchmark_gguf(model,
+                           prompt_length - 1,
+                           new_tokens,
+                           args.replica,
+                           memory_tracker)
+        
         experiment = {
+            # experiment configuration
             "memo": args.memo,
-            "Quant. Method": 'gguf',
-            "llama_cpp_v": llama_cpp.__version__,
             "Run Name": RUN_NAME,
+            # software configuration
+            "llama_cpp_v": llama_cpp.__version__,
+            # hardware configuration
             "Device": torch.cuda.get_device_name(),
             "VRAM (GB)": round(torch.cuda.get_device_properties('cuda').total_memory / 1024 / 1024 / 1024, 2),
             "RAM (GB)": round(psutil.virtual_memory().total / 1024 / 1024 / 1024, 2),
             "CPU Count": len(psutil.Process().cpu_affinity()),
+            # model configuration
+            "Quant. Method": 'gguf',
             "Model": os.path.basename(model_path),
             "Model Size (GB)": round(os.path.getsize(model_path) / 1024 / 1024 / 1024, 2),
-            "Context Window": args.ctx,
-            "GPU Layers": ngl,
-            "Batch": n_batch,
-            "Threads": n_threads,
-            "Batch Threads": n_threads_batch,
+            "Batch Size": n_batch,
+            "Context Length": args.ctx,
+            "Decode Threads": n_threads,
+            "Prefill Threads": n_threads_batch,
             "Prompt Length": prompt_length,
             "New Tokens": new_tokens,
+            "GPU Layers": ngl,
+            **diagnostics
             }
-
-        experiment.update(
-            benchmark_gguf(model,
-                           prompt_length - 1,
-                           new_tokens,
-                           args.replica))
 
         if not args.debug:
             bulb = pd.concat([bulb, pd.DataFrame([experiment])], ignore_index=True)
