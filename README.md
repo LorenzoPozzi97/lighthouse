@@ -1,6 +1,9 @@
 # Lighthouse
 <img src="https://github.com/LorenzoPozzi97/lighthouse/assets/83987444/283cb75c-c033-4b9d-8dcd-668b4054ad18" width="400" height="400">
 
+## Author note
+At the moment, this repositoru is no longer under maintainance. I strongly suggest https://github.com/huggingface/optimum-benchmark for a well-done multi-backend and multi-model benchmarking library.
+
 ## Benchmarking inference of quantized LLM models
 Quantization is the current way-to-go to run local models. However, performance of a model can remarkably vary depending many factors: quantization method, but also hardware, model architecture, kernel, etc. The lighthouse intention is sheding light on LLMs inference performance, providing out-of-the-box funcitonalities to benchmark quantized models and quickly understand their potention across different configurations.
 
